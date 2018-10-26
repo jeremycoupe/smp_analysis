@@ -1,26 +1,49 @@
 import psycopg2
 import pandas.io.sql as psql
-import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import glob
-import os.path
+import numpy as np
 
-#conn = psycopg2.connect("dbname='fuserclt' user='fuserclt' password='fuserclt' host='localhost' ")
+def f_smp_data(df0):
+	unique_smp = df0['dmp_id'].unique()
 
-###########################
-# conn = psycopg2.connect("dbname='fuser' user='fuser' password='fuser' host='localhost' ")
+	df_binary_status = pd.DataFrame()
+	df_count_status = pd.DataFrame()
+	df_summary = pd.DataFrame()
 
-# cursor = conn.cursor()
-# sql_file = open('smp_query.sql')
+	status_vec = ['PROPOSED','AFFIRMED','REJECTED','ACTIVE','OBSOLETE','COMPLETED']
 
-# df0 = psql.read_sql( sql_file.read() , conn)
+	idx=-1
+	for dmp_id in range(len(unique_smp)):
+		idx+=1
+		df_temp = df0[df0['dmp_id']==unique_smp[dmp_id]].reset_index()
+		df_temp.to_csv('/Users/wcoupe/Documents/git/smp_analysis/data/debug'+unique_smp[dmp_id]+'.csv')
+		df_count_status.loc[idx,'dmp_id'] = unique_smp[dmp_id]
+		df_binary_status.loc[idx,'dmp_id'] = unique_smp[dmp_id]
+		for dmp_status in range(len(status_vec)):
+			count_status = 0
+			if df_temp.loc[0,'dmp_status'] == status_vec[dmp_status]:
+				count_status +=1
+			for row in range(1,len(df_temp)):
+				if df_temp.loc[row,'dmp_status'] != df_temp.loc[row-1,'dmp_status']:
+					if df_temp.loc[row,'dmp_status'] == status_vec[dmp_status]:
+						count_status +=1
+			df_count_status.loc[idx,status_vec[dmp_status]] = count_status
 
-# df0.to_csv('rophy_dmp_data.csv')
-###########################
+			if count_status > 0:
+				df_binary_status.loc[idx,status_vec[dmp_status]] = True
+			else:
+				df_binary_status.loc[idx,status_vec[dmp_status]] = None
 
-# df0 = pd.read_csv('/Users/wcoupe/Documents/git/smp_analysis/data/smp_data_example.csv',parse_dates=['start_time','end_time','eta_msg_time'])
-# df0 = df0.rename(columns={"eta_msg_time": "record_timestamp"})
+	
+	for dmp_status in range(len(status_vec)):
+		df_summary.loc[dmp_status,'dmp_status'] = status_vec[dmp_status]
+		df_summary.loc[dmp_status,'count'] = len( df_binary_status[ df_binary_status[status_vec[dmp_status]] == True ] )
+
+
+	df_count_status.to_csv('/Users/wcoupe/Documents/git/smp_analysis/data/smp_count_status_2018-10-24.csv',index=False)
+	df_binary_status.to_csv('/Users/wcoupe/Documents/git/smp_analysis/data/smp_binary_status_2018-10-24.csv',index=False)
+	df_summary.to_csv('/Users/wcoupe/Documents/git/smp_analysis/data/smp_summary_2018-10-24.csv',index=False)
 
 def plot_single_day_smp(df0):
 
@@ -34,8 +57,6 @@ def plot_single_day_smp(df0):
 			if (lookahead_vec[-1] / float(6)) % 5 == 0:
 				xtick_vec.append(lookahead_vec[-1]/6)
 
-
-
 	unique_dmp = df0['dmp_id'].unique()
 
 	for dmp_id in range(len(unique_dmp)):
@@ -43,14 +64,6 @@ def plot_single_day_smp(df0):
 		df.to_csv('/Users/wcoupe/Documents/git/smp_analysis/data/' + unique_dmp[dmp_id]+'.csv',index=False)
 
 		if  df['dmp_status'].str.contains('ACTIVE').any():
-			
-
-			# start_accuracy = [[] for i in range(len(lookahead_vec))]
-			# end_accuracy = [[] for i in range(len(lookahead_vec))]
-			# count_accuracy = [[] for i in range(len(lookahead_vec))]
-			# average_accuracy = [[] for i in range(len(lookahead_vec))]
-			# max_accuracy = [[] for i in range(len(lookahead_vec))]
-
 
 
 			plt.figure(dmp_id,figsize=(16,10))
@@ -191,27 +204,12 @@ def plot_single_day_smp(df0):
 			plt.savefig('/Users/wcoupe/Documents/git/smp_analysis/figs/' + unique_dmp[dmp_id]+'_lead_time_' + str(lead_time_parameter) + '.png')
 			plt.close('all')
 
-
-
-# path = '/Users/wcoupe/Documents/Research/smp_predictions/code/debug2/'
-# allFiles = glob.glob(os.path.join(path, "**", "*.csv"),recursive=True)
-
 conn = psycopg2.connect("dbname='fuserclt' user='fuserclt' password='fuserclt' host='localhost' ")
-
-##########################
-#conn = psycopg2.connect("dbname='fuser' user='fuser' password='fuser' host='localhost' ")
-
 cursor = conn.cursor()
-sql_file = open('smp_query.sql')
-
+sql_file = open('smp_query_2.sql')
 df0 = psql.read_sql( sql_file.read() , conn)
 
-df0.to_csv('found_dmp.csv')
-##########################
 
-
-# for f in allFiles:
-# 	print(f)
-# 	#df0 = pd.read_csv(f,parse_dates=['start_time','end_time','eta_msg_time'])
-# 	#df0 = df0.rename(columns={"eta_msg_time": "record_timestamp"})
+f_smp_data(df0)
 plot_single_day_smp(df0)
+
